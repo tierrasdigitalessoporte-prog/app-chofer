@@ -24,22 +24,10 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
-// Servicio en primer plano ("foreground service") que manda la ubicación
-// del chofer al servidor cada ~12 segundos MIENTRAS LA RUTA ESTÁ EN CURSO,
-// sin importar si cambia de pantalla (WhatsApp, Waze, se le apaga la
-// pantalla). Esto es justo lo que Android exige para que una app pueda
-// seguir corriendo en segundo plano sin que el sistema la mate para
-// ahorrar batería: mostrar SIEMPRE una notificación fija avisando que se
-// está compartiendo la ubicación (igual que hacen Uber/Didi/apps de
-// reparto) — no se puede quitar esa notificación, es una regla de Android,
-// no algo que se nos haya olvidado programar.
 public class RastreoService extends Service {
 
     public static final String EXTRA_RUTA_ID = "rutaId";
 
-    // Mismo dominio que ya usa capacitor.config.ts para cargar la página, y
-    // el mismo endpoint que ya usa la versión web (ajax/chofer_actualizar_ubicacion.php)
-    // — no hace falta nada nuevo del lado del servidor.
     private static final String URL_ACTUALIZAR_UBICACION =
         "https://transporte-escolar.tierras-digitales.com/transporte-escolar/ajax/chofer_actualizar_ubicacion.php";
     private static final long INTERVALO_MS = 12000;
@@ -73,15 +61,15 @@ public class RastreoService extends Service {
         }
 
         iniciarActualizacionesUbicacion();
-        // START_STICKY: si Android llega a matar el proceso por falta de
-        // memoria, intenta volver a levantarlo — aunque, al llevar la
-        // notificación fija, esto casi nunca hace falta.
         return START_STICKY;
     }
 
     private void iniciarActualizacionesUbicacion() {
-        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED) {
+        boolean tienePreciso = ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED;
+        boolean tieneAproximado = ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED;
+        if (!tienePreciso && !tieneAproximado) {
             stopSelf();
             return;
         }
@@ -96,7 +84,7 @@ public class RastreoService extends Service {
             @Override public void onProviderDisabled(String provider) {}
         };
         try {
-            if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+            if (tienePreciso && locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
                 locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, INTERVALO_MS, 0, locationListener, hiloTrabajo.getLooper());
             }
             if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
@@ -122,12 +110,9 @@ public class RastreoService extends Service {
                 try (OutputStream os = conn.getOutputStream()) {
                     os.write(cuerpo.getBytes(StandardCharsets.UTF_8));
                 }
-                conn.getResponseCode(); // dispara la petición; no hace falta leer la respuesta
+                conn.getResponseCode();
             } catch (Exception e) {
-                // Sin conexión momentánea, etc. — se intenta de nuevo en la
-                // siguiente actualización de ubicación, no hace falta avisar
-                // aquí (el papá ve "no ha iniciado"/última posición vieja
-                // hasta que vuelva a haber señal).
+                // Sin conexión momentánea, etc.
             } finally {
                 if (conn != null) conn.disconnect();
             }
