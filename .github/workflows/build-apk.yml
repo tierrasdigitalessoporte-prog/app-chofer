@@ -1,11 +1,5 @@
 name: Generar APK de App Chofer
 
-# Este archivo hace que GitHub compile la app automáticamente cada vez que
-# subas o actualices el proyecto. No necesitas instalar nada en tu
-# computadora ni saber programación: solo subir la carpeta y esperar unos
-# minutos. Cuando termine, el archivo .apk queda listo para descargar en la
-# pestaña "Actions" de este repositorio, dentro de la ejecución más
-# reciente, en la sección "Artifacts".
 on:
   push:
     branches: [ main, master ]
@@ -29,6 +23,9 @@ jobs:
 
       - name: Instalar las piezas de Capacitor (no se suben con el proyecto para que pese menos)
         run: npm install
+
+      - name: Reconstruir archivos generados de Capacitor
+        run: npx cap sync android
 
       - name: Dar permiso de ejecución a gradlew
         run: chmod +x android/gradlew
