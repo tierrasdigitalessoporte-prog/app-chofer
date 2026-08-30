@@ -1,0 +1,45 @@
+name: Generar APK de App Chofer
+
+# Este archivo hace que GitHub compile la app automáticamente cada vez que
+# subas o actualices el proyecto. No necesitas instalar nada en tu
+# computadora ni saber programación: solo subir la carpeta y esperar unos
+# minutos. Cuando termine, el archivo .apk queda listo para descargar en la
+# pestaña "Actions" de este repositorio, dentro de la ejecución más
+# reciente, en la sección "Artifacts".
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch: {}
+
+jobs:
+  compilar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código del proyecto
+        uses: actions/checkout@v4
+
+      - name: Preparar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Preparar el SDK de Android
+        uses: android-actions/setup-android@v3
+
+      - name: Instalar las piezas de Capacitor (no se suben con el proyecto para que pese menos)
+        run: npm install
+
+      - name: Dar permiso de ejecución a gradlew
+        run: chmod +x android/gradlew
+
+      - name: Compilar el APK (versión de prueba, para instalar directo en un celular)
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Dejar el APK disponible para descargar
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-chofer-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
